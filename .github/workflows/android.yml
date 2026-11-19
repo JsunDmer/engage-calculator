@@ -28,7 +28,7 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Run unit tests
         run: ./gradlew :core:test --stacktrace
@@ -37,7 +37,7 @@ jobs:
         run: ./gradlew :app:assembleDebug --stacktrace
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: engage-calculator-debug
           path: app/build/outputs/apk/debug/*.apk
@@ -61,7 +61,7 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       # tag 形如 v1.2.3：去掉前缀作为 versionName，tag 序号作为 versionCode。
       - name: Derive version
