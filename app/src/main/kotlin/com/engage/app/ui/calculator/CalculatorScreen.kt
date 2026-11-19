@@ -49,9 +49,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.engage.app.ui.common.CharacterAvatar
+import com.engage.app.ui.common.GrowthScale
 import com.engage.app.ui.common.InfoBanner
 import com.engage.app.ui.common.SectionCard
 import com.engage.app.ui.common.TierBadge
+import com.engage.app.ui.common.growthColor
+import com.engage.app.ui.common.growthSlashText
 import com.engage.app.ui.theme.Gold
 import com.engage.core.Character
 import com.engage.core.ClassInfo
@@ -182,6 +185,7 @@ private fun CharacterCard(state: CalcUiState, onClick: () -> Unit, onToggleStar:
                     state.totalGrowth.toString(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    color = growthColor(GrowthScale.characterTotal(state.totalGrowth)),
                 )
             }
         }
@@ -361,10 +365,10 @@ private fun StageCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val growth = cls?.growth ?: emptyList()
             Text(
-                (cls?.growth ?: emptyList()).joinToString("/"),
+                text = growthSlashText(growth, GrowthScale::classStat),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
             )
         }
     }
@@ -486,7 +490,8 @@ private fun GrowthCard(state: CalcUiState) {
                     add(TableCell(row.personal.toString(), CellRole.Muted))
                     row.perStage.forEach { bonus ->
                         add(TableCell(if (bonus == 0) "—" else "+$bonus", CellRole.Muted))
-                        add(TableCell((row.personal + bonus + row.star).toString(), CellRole.Emphasis))
+                        val combined = row.personal + bonus + row.star
+                        add(TableCell(combined.toString(), GrowthScale.combined(combined).toCellRole()))
                     }
                     add(TableCell(if (row.star > 0) "+${row.star}" else "—", CellRole.Muted))
                 }
@@ -496,17 +501,20 @@ private fun GrowthCard(state: CalcUiState) {
                 label = "合计",
                 cells = buildList {
                     val personalTotal = state.character.growth.sum()
-                    add(TableCell(personalTotal.toString(), CellRole.Muted))
+                    add(
+                        TableCell(
+                            personalTotal.toString(),
+                            GrowthScale.characterTotal(personalTotal).toCellRole(),
+                        )
+                    )
                     val starPerStat = if (state.starGem) state.dataset.starGrowth else 0
                     state.stages.indices.forEach { i ->
                         val bonusTotal = state.growthRows.sumOf { it.perStage.getOrElse(i) { 0 } }
                         add(TableCell(if (bonusTotal == 0) "—" else "+$bonusTotal", CellRole.Muted))
-                        add(
-                            TableCell(
-                                (personalTotal + bonusTotal + starPerStat * state.stats.size).toString(),
-                                CellRole.Emphasis,
-                            )
-                        )
+                        val combinedTotal = personalTotal + bonusTotal + starPerStat * state.stats.size
+                        // 合计是 9 项之和，按单属性均值落档，与行内配色保持一致
+                        val tier = GrowthScale.combined(combinedTotal / state.stats.size.coerceAtLeast(1))
+                        add(TableCell(combinedTotal.toString(), tier.toCellRole()))
                     }
                     val starTotal = starPerStat * state.stats.size
                     add(TableCell(if (starTotal > 0) "+$starTotal" else "—", CellRole.Muted))

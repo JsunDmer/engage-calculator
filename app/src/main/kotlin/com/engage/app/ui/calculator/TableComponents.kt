@@ -25,8 +25,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.engage.app.ui.common.GrowthTier
+import com.engage.app.ui.common.growthColor
 
-enum class CellRole { Normal, Muted, Emphasis, Up, Hit }
+enum class CellRole { Normal, Muted, Emphasis, Up, Hit, GrowthHigh, GrowthMid, GrowthLow }
+
+private fun CellRole.toGrowthTierOrNull(): GrowthTier? = when (this) {
+    CellRole.GrowthHigh -> GrowthTier.High
+    CellRole.GrowthMid -> GrowthTier.Mid
+    CellRole.GrowthLow -> GrowthTier.Low
+    else -> null
+}
+
+internal fun GrowthTier.toCellRole(): CellRole = when (this) {
+    GrowthTier.High -> CellRole.GrowthHigh
+    GrowthTier.Mid -> CellRole.GrowthMid
+    GrowthTier.Low -> CellRole.GrowthLow
+}
 
 data class TableCell(val value: String, val role: CellRole = CellRole.Normal)
 
@@ -152,13 +167,20 @@ private fun HeaderCell(text: String, width: Dp, bg: Color, align: TextAlign) {
 
 @Composable
 private fun ValueCell(cell: TableCell, bold: Boolean = false) {
-    val color = when (cell.role) {
-        CellRole.Muted -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-        CellRole.Emphasis -> MaterialTheme.colorScheme.primary
-        CellRole.Up -> MaterialTheme.colorScheme.tertiary
-        CellRole.Hit -> MaterialTheme.colorScheme.error
-        CellRole.Normal -> MaterialTheme.colorScheme.onSurface
+    val growthTier = cell.role.toGrowthTierOrNull()
+    val color = if (growthTier != null) {
+        growthColor(growthTier)
+    } else {
+        when (cell.role) {
+            CellRole.Muted -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+            CellRole.Emphasis -> MaterialTheme.colorScheme.primary
+            CellRole.Up -> MaterialTheme.colorScheme.tertiary
+            CellRole.Hit -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurface
+        }
     }
+    val emphasized = bold || cell.role == CellRole.Emphasis || cell.role == CellRole.Hit ||
+        growthTier == GrowthTier.High
     Box(
         Modifier
             .width(CellWidth)
@@ -168,11 +190,7 @@ private fun ValueCell(cell: TableCell, bold: Boolean = false) {
         Text(
             cell.value,
             style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (bold || cell.role == CellRole.Emphasis || cell.role == CellRole.Hit) {
-                FontWeight.Bold
-            } else {
-                FontWeight.Normal
-            },
+            fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Normal,
             color = color,
             maxLines = 1,
         )

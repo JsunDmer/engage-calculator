@@ -39,9 +39,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.engage.app.ui.common.GrowthScale
+import com.engage.app.ui.common.GrowthTier
 import com.engage.app.ui.common.KeyValue
 import com.engage.app.ui.common.SectionCard
 import com.engage.app.ui.common.TierBadge
+import com.engage.app.ui.common.growthColor
 import com.engage.app.ui.common.multiline
 import com.engage.app.ui.theme.Gold
 import com.engage.core.ClassInfo
@@ -172,7 +175,8 @@ private fun ClassRow(cls: ClassInfo, onClick: () -> Unit) {
             Text(
                 "成长 ${cls.growthTotal}",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                color = growthColor(GrowthScale.classTotal(cls.growthTotal)),
             )
             Text(
                 "上限 ${cls.capTotal}",
@@ -235,7 +239,16 @@ private fun ClassDetailScreen(cls: ClassInfo, stats: List<String>, onBack: () ->
         }
 
         item { StatTableCard(title = "基础能力值", stats = stats, values = cls.base, total = cls.base.sum()) }
-        item { StatTableCard(title = "成长率（%）", stats = stats, values = cls.growth, total = cls.growthTotal) }
+        item {
+            StatTableCard(
+                title = "成长率（%）",
+                stats = stats,
+                values = cls.growth,
+                total = cls.growthTotal,
+                valueTier = GrowthScale::classStat,
+                totalTier = GrowthScale.classTotal(cls.growthTotal),
+            )
+        }
         item {
             StatTableCard(
                 title = "职业上限",
@@ -258,6 +271,8 @@ private fun StatTableCard(
     values: List<Int>,
     total: Int,
     subNote: String? = null,
+    valueTier: ((Int) -> GrowthTier)? = null,
+    totalTier: GrowthTier? = null,
 ) {
     SectionCard(title = title, subtitle = subNote) {
         // 9 项属性在手机上会超宽，按两行排列以保持可读性
@@ -284,6 +299,8 @@ private fun StatTableCard(
                                 value.toString(),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
+                                color = valueTier?.let { growthColor(it(value)) }
+                                    ?: MaterialTheme.colorScheme.onSurface,
                             )
                         }
                         if (i != rowStats.lastIndex) Spacer(Modifier.width(4.dp))
@@ -308,7 +325,7 @@ private fun StatTableCard(
                     total.toString(),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Gold,
+                    color = totalTier?.let { growthColor(it) } ?: Gold,
                 )
             }
         }

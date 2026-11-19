@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.engage.app.ui.common.CharacterAvatar
+import com.engage.app.ui.common.GrowthScale
 import com.engage.app.ui.common.TierBadge
+import com.engage.app.ui.common.growthColor
 import com.engage.app.ui.theme.Gold
 import com.engage.core.Character
 import com.engage.core.ClassInfo
@@ -76,7 +78,7 @@ internal fun CharacterSheet(
                     Text(
                         character.growth.sum().toString(),
                         style = MaterialTheme.typography.labelMedium,
-                        color = Gold,
+                        color = growthColor(GrowthScale.characterTotal(character.growth.sum())),
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -146,7 +148,8 @@ internal fun ClassSheet(
                                 Text(
                                     "成长补正 ${cls.growthTotal}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Bold,
+                                    color = growthColor(GrowthScale.classTotal(cls.growthTotal)),
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Text(
