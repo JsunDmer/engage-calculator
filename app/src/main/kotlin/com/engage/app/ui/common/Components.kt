@@ -178,7 +178,12 @@ private object AvatarCache {
 }
 
 @Composable
-fun CharacterAvatar(path: String, size: Dp = 54.dp, modifier: Modifier = Modifier) {
+fun AssetAvatar(
+    path: String,
+    size: Dp = 54.dp,
+    modifier: Modifier = Modifier,
+    fallback: String = "",
+) {
     val context = LocalContext.current
     var bitmap by remember(path) { mutableStateOf<Bitmap?>(null) }
     LaunchedEffect(path) {
@@ -193,16 +198,23 @@ fun CharacterAvatar(path: String, size: Dp = 54.dp, modifier: Modifier = Modifie
             .border(1.dp, Gold.copy(alpha = 0.35f), shape),
         contentAlignment = Alignment.Center,
     ) {
-        bitmap?.let {
+        val loaded = bitmap
+        if (loaded != null) {
             Image(
-                bitmap = it.asImageBitmap(),
+                bitmap = loaded.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(size).clip(shape),
             )
+        } else if (fallback.isNotEmpty()) {
+            Text(fallback, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
+
+@Composable
+fun CharacterAvatar(path: String, size: Dp = 54.dp, modifier: Modifier = Modifier) =
+    AssetAvatar(path, size, modifier)
 
 @Composable
 fun LabeledRow(label: String, trailing: @Composable () -> Unit) {

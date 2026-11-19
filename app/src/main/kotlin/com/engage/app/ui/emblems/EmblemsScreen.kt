@@ -2,6 +2,7 @@ package com.engage.app.ui.emblems
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,40 +42,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.engage.app.ui.common.AssetAvatar
 import com.engage.app.ui.common.InfoBanner
 import com.engage.app.ui.common.KeyValue
 import com.engage.app.ui.common.SectionCard
 import com.engage.app.ui.common.multiline
 import com.engage.app.ui.theme.Gold
-import com.engage.app.ui.theme.Navy
+import com.engage.app.ui.theme.GoldLight
+import com.engage.app.ui.theme.WarmInk
 import com.engage.core.Dataset
 import com.engage.core.Emblem
 import com.engage.core.EmblemSkill
-import com.engage.core.SkillChain
 
 private val SectionFilters = listOf("全部", "本篇", "DLC")
-private val KindOrder = listOf(
-    "同步特技", "结合武器", "结合指令技", "结合特技", "继承特技", "解锁资质", "解锁功能",
-)
-
-/** 三鼎纹章士的技能链与三位学级长的技能共用，这里做一次归属映射。 */
-private fun aliasesOf(emblem: Emblem): Set<String> = buildSet {
-    add(emblem.name)
-    when (emblem.name) {
-        "艾黛尔贾特", "帝弥托利", "库罗德" -> add("三鼎")
-        "鲁弗莱" -> add("库洛武")
-    }
-}
-
-/** 技能表里的纹章士字段可能是「库洛武 / 鲁弗莱」这种合写形式。 */
-private fun skillBelongsTo(skill: EmblemSkill, emblem: Emblem): Boolean =
-    skill.emblem.split('/', '／').any { it.trim() == emblem.name } ||
-        skill.emblem == emblem.name
+private val ViewFilters = listOf("纹章士", "资质", "牵绊戒指")
 
 @Composable
 fun EmblemsScreen(dataset: Dataset) {
     var query by remember { mutableStateOf("") }
     var sectionFilter by remember { mutableStateOf("全部") }
+    var view by remember { mutableStateOf("纹章士") }
     var selected by remember { mutableStateOf<Emblem?>(null) }
 
     selected?.let { emblem ->
@@ -81,6 +69,43 @@ fun EmblemsScreen(dataset: Dataset) {
         return
     }
 
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            ViewFilters.forEach { label ->
+                FilterChip(
+                    selected = view == label,
+                    onClick = { view = label },
+                    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                )
+            }
+        }
+
+        if (view == "资质") {
+            QualificationsScreen(dataset = dataset, onOpenEmblem = { selected = it })
+            return@Column
+        }
+
+        if (view == "牵绊戒指") {
+            BondRingsScreen(dataset = dataset)
+            return@Column
+        }
+
+        EmblemList(dataset, query, { query = it }, sectionFilter, { sectionFilter = it }) { selected = it }
+    }
+}
+
+@Composable
+private fun EmblemList(
+    dataset: Dataset,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    sectionFilter: String,
+    onSectionChange: (String) -> Unit,
+    onSelect: (Emblem) -> Unit,
+) {
     val filtered = dataset.emblems.filter { emblem ->
         (sectionFilter == "全部" || emblem.section == sectionFilter) &&
             (query.isBlank() || emblem.name.contains(query) || emblem.chapter.contains(query))
@@ -90,12 +115,12 @@ fun EmblemsScreen(dataset: Dataset) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it },
+                onValueChange = onQueryChange,
                 placeholder = { Text("搜索纹章士 / 章节", style = MaterialTheme.typography.bodySmall) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) {
+                        IconButton(onClick = { onQueryChange("") }) {
                             Icon(Icons.Default.Close, contentDescription = "清空")
                         }
                     }
@@ -109,7 +134,7 @@ fun EmblemsScreen(dataset: Dataset) {
                 SectionFilters.forEach { section ->
                     FilterChip(
                         selected = sectionFilter == section,
-                        onClick = { sectionFilter = section },
+                        onClick = { onSectionChange(section) },
                         label = { Text(section, style = MaterialTheme.typography.labelMedium) },
                     )
                 }
@@ -129,14 +154,14 @@ fun EmblemsScreen(dataset: Dataset) {
                 )
             }
             items(filtered, key = { it.name }) { emblem ->
-                EmblemRow(emblem = emblem, onClick = { selected = emblem })
+                EmblemRow(emblem = emblem, onClick = { onSelect(emblem) })
             }
         }
     }
 }
 
 @Composable
-private fun EmblemRow(emblem: Emblem, onClick: () -> Unit) {
+internal fun EmblemRow(emblem: Emblem, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -146,19 +171,7 @@ private fun EmblemRow(emblem: Emblem, onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(if (emblem.section == "DLC") Gold else Navy),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                emblem.name.take(1),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.surface,
-            )
-        }
+        AssetAvatar(emblem.avatar, 42.dp, fallback = emblem.name.take(1))
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -186,43 +199,33 @@ private fun EmblemRow(emblem: Emblem, onClick: () -> Unit) {
 
 @Composable
 private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> Unit) {
-    val skills = remember(emblem, dataset) {
-        dataset.skills.filter { skillBelongsTo(it, emblem) }
-            .sortedBy { KindOrder.indexOf(it.kind).let { i -> if (i < 0) 99 else i } }
-            .groupBy { it.kind }
-            .toList()
-            .sortedBy { (kind, _) -> KindOrder.indexOf(kind).let { i -> if (i < 0) 99 else i } }
+    val syncLines = remember(emblem, dataset) { chainLinesOf(dataset, emblem, "同步") }
+    val inheritLines = remember(emblem, dataset) { chainLinesOf(dataset, emblem, "继承") }
+    val engageWeapons = remember(emblem, dataset) { skillsOf(dataset, emblem, "结合武器") }
+    val engageCmds = remember(emblem, dataset) { skillsOf(dataset, emblem, "结合指令技") }
+    val engageSkills = remember(emblem, dataset) { skillsOf(dataset, emblem, "结合特技") }
+    val unlocks = remember(emblem, dataset) {
+        skillsOf(dataset, emblem, "解锁功能") + skillsOf(dataset, emblem, "解锁资质")
     }
-    val aliases = remember(emblem) { aliasesOf(emblem) }
-    val chains = remember(emblem, dataset) {
-        dataset.chains.filter { it.emblem in aliases }
-            .sortedBy { if (it.kind == "同步") 0 else 1 }
+    val qualifications = remember(emblem, dataset) {
+        skillsOf(dataset, emblem, "解锁资质")
+    }
+    val bondRings = remember(emblem, dataset) {
+        dataset.rings.filter { it.emblem == emblem.name }
     }
 
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回列表")
                 }
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (emblem.section == "DLC") Gold else Navy),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        emblem.name.take(1),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.surface,
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
+                AssetAvatar(emblem.avatar, 56.dp, fallback = emblem.name.take(1))
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(emblem.name, style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -237,7 +240,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
         item {
             SectionCard(title = "基本信息") {
                 KeyValue("获得", emblem.joinCondition)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     "满级牵绊加成",
                     style = MaterialTheme.typography.labelMedium,
@@ -257,66 +260,34 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                KeyValue("初始同步", emblem.firstSyncSkill)
-                Spacer(Modifier.height(4.dp))
-                KeyValue("初始继承", emblem.firstInheritSkill)
-                Spacer(Modifier.height(4.dp))
-                KeyValue("初始结合", emblem.firstEngageSkill)
-                Spacer(Modifier.height(4.dp))
-                KeyValue("初始连携", emblem.firstComboSkill)
-                Spacer(Modifier.height(4.dp))
-                KeyValue("结合武器", emblem.firstEngageWeapon)
             }
         }
 
-        item {
-            SectionCard(title = "解锁流程", subtitle = "牵绊等级提升后开启的能力") {
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    multiline(emblem.unlocks).forEach { line ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier
-                                    .size(4.dp)
-                                    .clip(CircleShape)
-                                    .background(Gold),
+        if (qualifications.isNotEmpty()) {
+            item {
+                SectionCard(title = "提供的资质") {
+                    qualifications.forEachIndexed { index, skill ->
+                        SkillLine(skill, emphasizeName = true)
+                        if (index != qualifications.lastIndex) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.padding(vertical = 6.dp),
                             )
-                            Spacer(Modifier.width(7.dp))
-                            Text(line, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
             }
         }
 
-        if (chains.isNotEmpty()) {
+        if (bondRings.isNotEmpty()) {
             item {
-                Text(
-                    "技能进化链",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-            items(chains, key = { "${it.kind}-${it.family}" }) { chain ->
-                ChainCard(chain)
-            }
-        }
-
-        if (skills.isNotEmpty()) {
-            item {
-                Text(
-                    "全部技能",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-            items(skills) { (kind, list) ->
-                SectionCard(title = kind, subtitle = "${list.size} 个") {
-                    list.forEachIndexed { index, skill ->
-                        SkillRow(skill)
-                        if (index != list.lastIndex) {
+                SectionCard(
+                    title = "牵绊戒指",
+                    subtitle = "${bondRings.size} 枚　C→B→A→S 递进，S 级解锁戒指特技",
+                ) {
+                    bondRings.forEachIndexed { index, ring ->
+                        RingRow(ring)
+                        if (index != bondRings.lastIndex) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant,
                                 modifier = Modifier.padding(vertical = 7.dp),
@@ -327,18 +298,96 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
             }
         }
 
+        if (syncLines.isNotEmpty()) {
+            item {
+                ChainSection(
+                    title = "同步特技",
+                    subtitle = "装备该纹章士即生效，随牵绊等级递进",
+                    lines = syncLines,
+                )
+            }
+        }
+
+        if (engageWeapons.isNotEmpty() || engageCmds.isNotEmpty() || engageSkills.isNotEmpty()) {
+            item {
+                SectionCard(title = "结合", subtitle = "结合状态下可用的武器、指令与特技") {
+                    EngageGroup("结合武器", engageWeapons)
+                    if (engageCmds.isNotEmpty()) {
+                        EngageGroup("结合指令技", engageCmds)
+                    }
+                    if (engageSkills.isNotEmpty()) {
+                        EngageGroup("结合特技", engageSkills)
+                    }
+                }
+            }
+        }
+
+        if (inheritLines.isNotEmpty()) {
+            item {
+                ChainSection(
+                    title = "继承特技",
+                    subtitle = "花费 SP 继承并装备后才生效",
+                    lines = inheritLines,
+                )
+            }
+        }
+
+        if (unlocks.isNotEmpty()) {
+            item {
+                SectionCard(title = "解锁功能", subtitle = "牵绊等级提升后开放") {
+                    unlocks.forEachIndexed { index, skill ->
+                        SkillLine(skill)
+                        if (index != unlocks.lastIndex) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.padding(vertical = 6.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
-            InfoBanner(text = "同步特技在被装备纹章士的角色身上生效；继承特技需在纹章士之间花费 SP 继承并装备后才生效，二者同名时不叠加。")
+            InfoBanner(text = "同步特技只对被装备纹章士的角色生效；继承特技需花费 SP 继承并装备，二者同名时不叠加。")
         }
         item { Spacer(Modifier.height(4.dp)) }
     }
 }
 
+/** 一组「名称 + 等级」明细，用于结合武器/指令技/特技这种非递进内容。 */
 @Composable
-private fun SkillRow(skill: EmblemSkill) {
-    Column {
+private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
+    if (skills.isEmpty()) return
+    Text(
+        title,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = Gold,
+        modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
+    )
+    skills.forEachIndexed { index, skill ->
+        SkillLine(skill)
+        if (index != skills.lastIndex) {
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(vertical = 6.dp),
+            )
+        }
+    }
+    Spacer(Modifier.height(4.dp))
+}
+
+@Composable
+private fun SkillLine(skill: EmblemSkill, emphasizeName: Boolean = false) {
+    Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(skill.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                skill.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (emphasizeName) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (emphasizeName) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
             Spacer(Modifier.width(6.dp))
             Text(
                 skill.bondLevel,
@@ -346,12 +395,8 @@ private fun SkillRow(skill: EmblemSkill) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
-            if (skill.sp.isNotBlank() && skill.sp != "—") {
-                Text(
-                    "${skill.sp} SP",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Gold,
-                )
+            if (skill.sp.isNotBlank() && skill.sp != "—" && skill.sp != "--") {
+                Text("${skill.sp} SP", style = MaterialTheme.typography.labelSmall, color = Gold)
             }
         }
         if (skill.detail.isNotBlank()) {
@@ -373,59 +418,114 @@ private fun SkillRow(skill: EmblemSkill) {
     }
 }
 
+/** 一条技能链占一行：横向滚动展示各阶，避免同类技能重复铺开。 */
 @Composable
-private fun ChainCard(chain: SkillChain) {
-    SectionCard(title = chain.family, subtitle = "${chain.kind}特技进化　合计 ${chain.totalSp} SP") {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            chain.steps.forEachIndexed { index, step ->
-                val parts = step.split('\n')
-                Row(verticalAlignment = Alignment.Top) {
-                    Box(
-                        Modifier
-                            .padding(top = 3.dp)
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(if (index == chain.steps.lastIndex) Gold else MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center,
-                    ) {
+private fun ChainSection(title: String, subtitle: String, lines: List<ChainLine>) {
+    val notes = lines.map { it.note }.filter { it.isNotBlank() }.distinct()
+    SectionCard(title = title, subtitle = subtitle) {
+        lines.forEachIndexed { index, line ->
+            ChainRow(line)
+            if (index != lines.lastIndex) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+        }
+        notes.forEach { note ->
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "※ $note",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChainRow(line: ChainLine) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                line.family,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.width(62.dp),
+            )
+            Row(
+                Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                line.steps.forEachIndexed { index, (name, meta) ->
+                    if (index > 0) {
                         Text(
-                            "${index + 1}",
-                            fontSize = 9.sp,
-                            color = if (index == chain.steps.lastIndex) MaterialTheme.colorScheme.surface
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            "›",
+                            color = MaterialTheme.colorScheme.outline,
+                            fontSize = 15.sp,
+                            modifier = Modifier.padding(horizontal = 3.dp),
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Column {
+                    ChainStep(name = name, meta = meta, isFinal = index == line.steps.lastIndex)
+                }
+                if (line.totalSp > 0) {
+                    Column(
+                        Modifier.padding(start = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Text(
-                            parts.firstOrNull().orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            "合计",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (parts.size > 1) {
-                            Text(
-                                parts[1],
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(
+                            "${line.totalSp} SP",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Gold,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }
-            if (chain.finalEffect.isNotBlank()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text(
-                    "满级效果：${chain.finalEffect}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (chain.note.isNotBlank()) {
-                Text(
-                    chain.note,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                )
-            }
+        }
+        if (line.maxEffect.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "满级：${line.maxEffect}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 62.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChainStep(name: String, meta: String, isFinal: Boolean) {
+    Column(
+        Modifier
+            .widthIn(max = 118.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isFinal) GoldLight else MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 7.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            name,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (isFinal) WarmInk else MaterialTheme.colorScheme.onSurface,
+        )
+        if (meta.isNotBlank()) {
+            Text(
+                meta,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }

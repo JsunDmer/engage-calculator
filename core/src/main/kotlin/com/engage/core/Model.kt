@@ -60,6 +60,8 @@ data class Emblem(
     @SerialName("combo") val firstComboSkill: String,
     @SerialName("weapon") val firstEngageWeapon: String,
     @SerialName("unlock") val unlocks: String,
+    /** assets 内的立绘相对路径，空串表示无立绘。 */
+    @SerialName("avatar") val avatar: String = "",
 )
 
 @Serializable
@@ -92,6 +94,28 @@ data class BattleType(
     @SerialName("d") val detail: String,
 )
 
+/** 牵绊戒指的一个强化等级，bonus 为累计值而非增量。 */
+@Serializable
+data class RingTier(
+    /** C / B / A / S。 */
+    @SerialName("r") val rank: String,
+    @SerialName("b") val bonuses: List<String> = emptyList(),
+    /** S 级戒指特技名，低等级为空。 */
+    @SerialName("k") val passive: String = "",
+    @SerialName("d") val passiveDetail: String = "",
+)
+
+@Serializable
+data class BondRing(
+    /** 所属纹章士，同一纹章士的戒指共用卡池与外观风格。 */
+    @SerialName("e") val emblem: String,
+    @SerialName("n") val name: String,
+    /** 卡池序号 1-10，「火焰纹章：英雄」系列为 0。 */
+    @SerialName("p") val pool: Int = 0,
+    @SerialName("avatar") val avatar: String = "",
+    @SerialName("t") val tiers: List<RingTier> = emptyList(),
+)
+
 @Serializable
 data class Dataset(
     @SerialName("stats") val stats: List<String>,
@@ -102,6 +126,7 @@ data class Dataset(
     @SerialName("skills") val skills: List<EmblemSkill> = emptyList(),
     @SerialName("chains") val chains: List<SkillChain> = emptyList(),
     @SerialName("types") val types: List<BattleType> = emptyList(),
+    @SerialName("rings") val rings: List<BondRing> = emptyList(),
 ) {
     val classByName: Map<String, ClassInfo> by lazy { classes.associateBy { it.name } }
 

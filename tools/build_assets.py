@@ -12,8 +12,19 @@ HTML = os.path.join(ROOT, "Engage转职计算器.html")
 OUT_DIR = os.path.join(ROOT, "app", "src", "main", "assets")
 OUT_JSON = os.path.join(OUT_DIR, "engage.json")
 AVATAR_DIR = os.path.join(OUT_DIR, "avatars")
+EMBLEM_DIR = os.path.join(OUT_DIR, "emblems")
+BOND_RINGS = os.path.join(ROOT, "tools", "bond_rings.json")
 
 STATS = ["HP", "力", "魔", "技", "速", "幸", "防", "魔防", "体"]
+
+# 纹章士立绘来自腾讯文档「03-纹章士信息」单元格图片，按图源编号命名。
+EMBLEM_ART = {
+    "马尔斯": "21", "赛莉卡": "02", "西格尔特": "12", "里弗": "05", "罗伊": "19",
+    "琳": "23", "艾莉可": "16", "艾克": "03", "米卡雅": "10", "露琪娜": "09",
+    "神威": "06", "贝雷特": "13", "琉尔": "17", "艾黛尔贾特": "15", "帝弥托利": "18",
+    "库罗德": "07", "琪姬": "04", "海克托尔": "08", "塞涅里欧": "14", "卡美拉": "01",
+    "库洛武": "11", "鲁弗莱": "20", "维洛妮卡": "00",
+}
 
 
 def load_sheets(path):
@@ -79,11 +90,14 @@ def build_emblems(rows):
     for row in rows[1:]:
         if not row.get("A"):
             continue
+        name = row.get("A", "")
+        art = EMBLEM_ART.get(name)
         out.append({
-            "n": row.get("A", ""), "sec": row.get("B", ""), "ch": row.get("C", ""),
+            "n": name, "sec": row.get("B", ""), "ch": row.get("C", ""),
             "join": row.get("D", ""), "bonus": row.get("E", ""), "sync": row.get("F", ""),
             "inherit": row.get("G", ""), "engage": row.get("H", ""), "combo": row.get("I", ""),
             "weapon": row.get("J", ""), "unlock": row.get("K", ""),
+            "avatar": f"emblems/emblem_{art}.webp" if art else "",
         })
     return out
 
@@ -179,6 +193,12 @@ def merge_classes(html_classes, sheet_classes):
     return out
 
 
+def load_bond_rings():
+    """牵绊戒指表来自腾讯文档「04-牵绊戒指」，已离线解析为固定结构。"""
+    with open(BOND_RINGS, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def main():
     sheets = load_sheets(XLSX)
     chars, html_classes = load_html_chars()
@@ -192,13 +212,15 @@ def main():
         "skills": build_skills(sheets[4]),
         "chains": build_chains(sheets[5]),
         "types": build_types(sheets[6]),
+        "rings": load_bond_rings(),
     }
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
     print("chars", len(payload["chars"]), "classes", len(payload["classes"]),
           "emblems", len(payload["emblems"]), "skills", len(payload["skills"]),
-          "chains", len(payload["chains"]), "types", len(payload["types"]))
+          "chains", len(payload["chains"]), "types", len(payload["types"]),
+          "rings", len(payload["rings"]))
     print("json bytes", os.path.getsize(OUT_JSON), "avatar bytes", avatar_bytes)
 
 
