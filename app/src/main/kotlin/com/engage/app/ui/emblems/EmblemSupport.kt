@@ -83,9 +83,10 @@ private fun SkillChain.toLine(): ChainLine {
         val parts = step.split('\n')
         parts.first().trim() to parts.getOrElse(1) { "" }.trim()
     }
-    val sp = steps.sumOf { step ->
-        Regex("""(\d+)\s*SP""").find(step)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-    }
+    // 技能链是逐级升级而非叠加，合计 SP 只看最高阶那一档。
+    val sp = steps.lastOrNull()?.let { step ->
+        Regex("""(\d+)\s*SP""").find(step)?.groupValues?.get(1)?.toIntOrNull()
+    } ?: 0
     return ChainLine(
         family = family.removeSuffix("Lv").ifEmpty { family },
         steps = parsed,
