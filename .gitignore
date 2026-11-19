@@ -2,6 +2,7 @@ local.properties
 .gradle/
 build/
 */build/
+core/bin/
 .idea/
 *.iml
 .DS_Store

@@ -39,13 +39,15 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // CI 通过环境变量注入签名，缺失时退回 debug 签名以便本地打包。
             val storePath = System.getenv("KEYSTORE_PATH")
-            if (!storePath.isNullOrBlank()) {
-                signingConfig = signingConfigs.create("release") {
+            signingConfig = if (!storePath.isNullOrBlank()) {
+                signingConfigs.create("release") {
                     storeFile = file(storePath)
                     storePassword = System.getenv("KEYSTORE_PASSWORD")
                     keyAlias = System.getenv("KEY_ALIAS")
                     keyPassword = System.getenv("KEY_PASSWORD")
                 }
+            } else {
+                signingConfigs.getByName("debug")
             }
         }
     }
