@@ -58,11 +58,13 @@ fun ClassesScreen(dataset: Dataset) {
     var query by remember { mutableStateOf("") }
     var tierFilter by remember { mutableStateOf("全部") }
     var sectionFilter by remember { mutableStateOf("全部") }
+    var weaponFilter by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<ClassInfo?>(null) }
 
     val filtered = dataset.classes.filter { cls ->
         (tierFilter == "全部" || cls.tier == tierFilter) &&
             (sectionFilter == "全部" || cls.section == sectionFilter) &&
+            (weaponFilter == null || hasWeapon(cls.weapons, weaponFilter!!)) &&
             (query.isBlank() || cls.name.contains(query) || cls.weapons.contains(query) || cls.skill.contains(query))
     }
 
@@ -90,6 +92,19 @@ fun ClassesScreen(dataset: Dataset) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                WeaponTypes.forEach { type ->
+                    FilterChip(
+                        selected = weaponFilter == type,
+                        onClick = { weaponFilter = if (weaponFilter == type) null else type },
+                        label = { Text(type, style = MaterialTheme.typography.labelMedium) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -130,14 +145,14 @@ fun ClassesScreen(dataset: Dataset) {
                 )
             }
             items(filtered, key = { it.name }) { cls ->
-                ClassRow(cls = cls, onClick = { selected = cls })
+                ClassRow(cls = cls, weaponFocus = weaponFilter, onClick = { selected = cls })
             }
         }
     }
 }
 
 @Composable
-private fun ClassRow(cls: ClassInfo, onClick: () -> Unit) {
+private fun ClassRow(cls: ClassInfo, weaponFocus: String?, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -164,7 +179,12 @@ private fun ClassRow(cls: ClassInfo, onClick: () -> Unit) {
             Spacer(Modifier.height(2.dp))
             Text(
                 buildString {
-                    append(cls.weapons.lineSequence().firstOrNull().orEmpty())
+                    // 武器筛选时展示完整资质串，方便直接对比各职业该武器的等级
+                    if (weaponFocus != null) {
+                        append(weaponGrades(cls.weapons).values.joinToString("、"))
+                    } else {
+                        append(cls.weapons.lineSequence().firstOrNull().orEmpty())
+                    }
                     if (cls.battleType.isNotEmpty()) append("　${cls.battleType}")
                 },
                 style = MaterialTheme.typography.labelSmall,
