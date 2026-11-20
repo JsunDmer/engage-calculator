@@ -270,6 +270,10 @@ def extract_skill_icons(z):
         digest = hashlib.md5(raw).hexdigest()[:8]
         if digest not in by_hash:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
+            # 技能表部分锚点是「图标+名称文字」的横幅图，直接缩进方格会变成不可读细条；
+            # 左侧方形区域即独立图标，裁掉右侧文字。
+            if image.width > image.height * 1.2:
+                image = image.crop((0, 0, image.height, image.height))
             buf = io.BytesIO()
             image.save(buf, "WEBP", lossless=True)
             data = buf.getvalue()
