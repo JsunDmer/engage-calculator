@@ -164,7 +164,8 @@ fun StatValue(
 }
 
 private object AvatarCache {
-    private val cache = LruCache<String, Bitmap>(64)
+    // 技能图标一屏可达数十张且跨技能链复用，64 条会频繁淘汰，扩容到 256。
+    private val cache = LruCache<String, Bitmap>(256)
 
     suspend fun load(context: Context, path: String): Bitmap? {
         if (path.isBlank()) return null
@@ -215,6 +216,34 @@ fun AssetAvatar(
 @Composable
 fun CharacterAvatar(path: String, size: Dp = 54.dp, modifier: Modifier = Modifier) =
     AssetAvatar(path, size, modifier)
+
+/** 技能图标：透明底 PNG 转的 webp，不加头像金边；缺图时保留占位方块避免布局跳动。 */
+@Composable
+fun SkillIcon(path: String, size: Dp, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var bitmap by remember(path) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(path) {
+        bitmap = if (path.isBlank()) null else AvatarCache.load(context, path)
+    }
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        modifier
+            .size(size)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        val loaded = bitmap
+        if (loaded != null) {
+            Image(
+                bitmap = loaded.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(size).clip(shape),
+            )
+        }
+    }
+}
 
 @Composable
 fun LabeledRow(label: String, trailing: @Composable () -> Unit) {

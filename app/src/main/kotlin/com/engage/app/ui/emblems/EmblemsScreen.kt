@@ -46,6 +46,7 @@ import com.engage.app.ui.common.AssetAvatar
 import com.engage.app.ui.common.InfoBanner
 import com.engage.app.ui.common.KeyValue
 import com.engage.app.ui.common.SectionCard
+import com.engage.app.ui.common.SkillIcon
 import com.engage.app.ui.common.multiline
 import com.engage.app.ui.theme.Gold
 import com.engage.app.ui.theme.GoldLight
@@ -267,7 +268,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
             item {
                 SectionCard(title = "提供的资质") {
                     qualifications.forEachIndexed { index, skill ->
-                        SkillLine(skill, emphasizeName = true)
+                        SkillLine(skill, iconPath = dataset.skillIcon(skill.name), emphasizeName = true)
                         if (index != qualifications.lastIndex) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant,
@@ -304,6 +305,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
                     title = "同步特技",
                     subtitle = "装备该纹章士即生效，随牵绊等级递进",
                     lines = syncLines,
+                    dataset = dataset,
                 )
             }
         }
@@ -311,12 +313,12 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
         if (engageWeapons.isNotEmpty() || engageCmds.isNotEmpty() || engageSkills.isNotEmpty()) {
             item {
                 SectionCard(title = "结合", subtitle = "结合状态下可用的武器、指令与特技") {
-                    EngageGroup("结合武器", engageWeapons)
+                    EngageGroup("结合武器", engageWeapons, dataset)
                     if (engageCmds.isNotEmpty()) {
-                        EngageGroup("结合指令技", engageCmds)
+                        EngageGroup("结合指令技", engageCmds, dataset)
                     }
                     if (engageSkills.isNotEmpty()) {
-                        EngageGroup("结合特技", engageSkills)
+                        EngageGroup("结合特技", engageSkills, dataset)
                     }
                 }
             }
@@ -328,6 +330,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
                     title = "继承特技",
                     subtitle = "花费 SP 继承并装备后才生效",
                     lines = inheritLines,
+                    dataset = dataset,
                 )
             }
         }
@@ -336,7 +339,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
             item {
                 SectionCard(title = "解锁功能", subtitle = "牵绊等级提升后开放") {
                     unlocks.forEachIndexed { index, skill ->
-                        SkillLine(skill)
+                        SkillLine(skill, iconPath = dataset.skillIcon(skill.name))
                         if (index != unlocks.lastIndex) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant,
@@ -357,7 +360,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
 
 /** 一组「名称 + 等级」明细，用于结合武器/指令技/特技这种非递进内容。 */
 @Composable
-private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
+private fun EngageGroup(title: String, skills: List<EmblemSkill>, dataset: Dataset) {
     if (skills.isEmpty()) return
     Text(
         title,
@@ -367,7 +370,7 @@ private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
         modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
     )
     skills.forEachIndexed { index, skill ->
-        SkillLine(skill)
+        SkillLine(skill, iconPath = dataset.skillIcon(skill.name))
         if (index != skills.lastIndex) {
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
@@ -379,9 +382,11 @@ private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
 }
 
 @Composable
-private fun SkillLine(skill: EmblemSkill, emphasizeName: Boolean = false) {
+private fun SkillLine(skill: EmblemSkill, iconPath: String, emphasizeName: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            SkillIcon(iconPath, 22.dp)
+            Spacer(Modifier.width(6.dp))
             Text(
                 skill.name,
                 style = MaterialTheme.typography.bodyMedium,
@@ -420,11 +425,11 @@ private fun SkillLine(skill: EmblemSkill, emphasizeName: Boolean = false) {
 
 /** 一条技能链占一行：横向滚动展示各阶，避免同类技能重复铺开。 */
 @Composable
-private fun ChainSection(title: String, subtitle: String, lines: List<ChainLine>) {
+private fun ChainSection(title: String, subtitle: String, lines: List<ChainLine>, dataset: Dataset) {
     val notes = lines.map { it.note }.filter { it.isNotBlank() }.distinct()
     SectionCard(title = title, subtitle = subtitle) {
         lines.forEachIndexed { index, line ->
-            ChainRow(line)
+            ChainRow(line, dataset)
             if (index != lines.lastIndex) {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -444,7 +449,7 @@ private fun ChainSection(title: String, subtitle: String, lines: List<ChainLine>
 }
 
 @Composable
-private fun ChainRow(line: ChainLine) {
+private fun ChainRow(line: ChainLine, dataset: Dataset) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -469,7 +474,12 @@ private fun ChainRow(line: ChainLine) {
                             modifier = Modifier.padding(horizontal = 3.dp),
                         )
                     }
-                    ChainStep(name = name, meta = meta, isFinal = index == line.steps.lastIndex)
+                    ChainStep(
+                        name = name,
+                        meta = meta,
+                        iconPath = dataset.skillIcon(name),
+                        isFinal = index == line.steps.lastIndex,
+                    )
                 }
                 if (line.totalSp > 0) {
                     Column(
@@ -504,7 +514,7 @@ private fun ChainRow(line: ChainLine) {
 }
 
 @Composable
-private fun ChainStep(name: String, meta: String, isFinal: Boolean) {
+private fun ChainStep(name: String, meta: String, iconPath: String, isFinal: Boolean) {
     Column(
         Modifier
             .widthIn(max = 118.dp)
@@ -513,6 +523,8 @@ private fun ChainStep(name: String, meta: String, isFinal: Boolean) {
             .padding(horizontal = 7.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        SkillIcon(iconPath, 26.dp)
+        Spacer(Modifier.height(2.dp))
         Text(
             name,
             style = MaterialTheme.typography.labelMedium,
