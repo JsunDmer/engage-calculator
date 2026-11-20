@@ -52,6 +52,7 @@ import com.engage.core.Dataset
 
 private val TierFilters = listOf("全部", "基础", "高级", "特殊")
 private val SectionFilters = listOf("全部", "专属职业", "通用职业")
+private val ViewFilters = listOf("列表", "成长率")
 
 @Composable
 fun ClassesScreen(dataset: Dataset) {
@@ -59,6 +60,7 @@ fun ClassesScreen(dataset: Dataset) {
     var tierFilter by remember { mutableStateOf("全部") }
     var sectionFilter by remember { mutableStateOf("全部") }
     var weaponFilter by remember { mutableStateOf<String?>(null) }
+    var view by remember { mutableStateOf("列表") }
     var selected by remember { mutableStateOf<ClassInfo?>(null) }
 
     val filtered = dataset.classes.filter { cls ->
@@ -75,6 +77,16 @@ fun ClassesScreen(dataset: Dataset) {
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ViewFilters.forEach { label ->
+                    FilterChip(
+                        selected = view == label,
+                        onClick = { view = label },
+                        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -130,6 +142,11 @@ fun ClassesScreen(dataset: Dataset) {
                     )
                 }
             }
+        }
+
+        if (view == "成长率") {
+            GrowthTable(classes = filtered, stats = dataset.stats, onSelect = { selected = it })
+            return@Column
         }
 
         LazyColumn(
