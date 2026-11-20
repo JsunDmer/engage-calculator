@@ -127,8 +127,17 @@ data class Dataset(
     @SerialName("chains") val chains: List<SkillChain> = emptyList(),
     @SerialName("types") val types: List<BattleType> = emptyList(),
     @SerialName("rings") val rings: List<BondRing> = emptyList(),
+    /** 归一技能名 → assets 图标路径；旧数据无此字段时为空，UI 显示占位。 */
+    @SerialName("skillIcons") val skillIcons: Map<String, String> = emptyMap(),
 ) {
     val classByName: Map<String, ClassInfo> by lazy { classes.associateBy { it.name } }
 
     fun classOf(name: String): ClassInfo? = classByName[name]
+
+    /** 按归一名查技能图标，未收录返回空串。 */
+    fun skillIcon(name: String): String = skillIcons[normalizeSkillName(name)] ?: ""
 }
+
+/** 技能名在不同表里有「Lv.5 / Lv5 / SP转换 / sp转换」写法差异，比对前先归一。 */
+fun normalizeSkillName(name: String): String =
+    name.replace(".", "").replace(" ", "").replace("＋", "+").lowercase()

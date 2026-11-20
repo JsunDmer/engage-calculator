@@ -13,6 +13,7 @@ OUT_DIR = os.path.join(ROOT, "app", "src", "main", "assets")
 OUT_JSON = os.path.join(OUT_DIR, "engage.json")
 AVATAR_DIR = os.path.join(OUT_DIR, "avatars")
 EMBLEM_DIR = os.path.join(OUT_DIR, "emblems")
+SKILL_ICON_DIR = os.path.join(OUT_DIR, "skills")
 BOND_RINGS = os.path.join(ROOT, "tools", "bond_rings.json")
 
 STATS = ["HP", "力", "魔", "技", "速", "幸", "防", "魔防", "体"]
@@ -199,10 +200,98 @@ def load_bond_rings():
         return json.load(f)
 
 
+def normalize_skill_name(name):
+    """技能名在不同表里有「Lv.5 / Lv5 / SP转换 / sp转换」写法差异，与 App 端归一规则保持一致。"""
+    return name.replace(".", "").replace(" ", "").replace("＋", "+").lower()
+
+
+def _sheet_cells_by_row(z, sheet_idx):
+    """drawing 锚点用绝对行号定位，load_sheets 的顺序列表可能因空行缺位，这里按 r 属性重读。"""
+    shared = z.read("xl/sharedStrings.xml").decode("utf-8")
+    strings = ["".join(re.findall(r"<t[^>]*>(.*?)</t>", si, re.S))
+               for si in re.findall(r"<si>(.*?)</si>", shared, re.S)]
+    xml = z.read(f"xl/worksheets/sheet{sheet_idx}.xml").decode("utf-8")
+    rows = {}
+    for row_xml in re.findall(r"<row[^>]*>.*?</row>", xml, re.S):
+        for col, row, attrs, value in re.findall(
+                r'<c r="([A-Z]+)(\d+)"([^>]*)>(?:<v>(.*?)</v>)?', row_xml):
+            val = value
+            if 't="s"' in attrs and value and value.isdigit():
+                val = strings[int(value)]
+            if val:
+                rows.setdefault(int(row), {})[col] = html.unescape(val).replace("\r", "").strip()
+    return rows
+
+
+def _drawing_anchors(z, drawing_idx):
+    """解析 drawing 的图片锚点：返回 (0基列, 1基行, media 路径) 列表。"""
+    rels = z.read(f"xl/drawings/_rels/drawing{drawing_idx}.xml.rels").decode("utf-8")
+    rel_map = dict(re.findall(r'Id="(rId\d+)"[^>]*Target="\.\./(media/[^"]+)"', rels))
+    xml = z.read(f"xl/drawings/drawing{drawing_idx}.xml").decode("utf-8")
+    out = []
+    for anchor in re.findall(r"<xdr:oneCellAnchor>.*?</xdr:oneCellAnchor>", xml, re.S):
+        pos = re.search(r"<xdr:col>(\d+)</xdr:col>.*?<xdr:row>(\d+)</xdr:row>", anchor, re.S)
+        embed = re.search(r'r:embed="(rId\d+)"', anchor)
+        if pos and embed and embed.group(1) in rel_map:
+            out.append((int(pos.group(1)), int(pos.group(2)) + 1, rel_map[embed.group(1)]))
+    return out
+
+
+def extract_skill_icons(z):
+    """技能图标内嵌在数据表里：drawing1 锚定技能表 D 列，drawing2 锚定进化链表 D–I 列各阶。
+
+    同名技能先到先得；图片按内容 md5 去重后转无损 webp，避免「斩不断的牵绊」这类共用图重复入库。
+    """
+    import hashlib
+    import io
+    from PIL import Image
+
+    names = {}
+    # 进化链表：锚点单元格首行即该阶技能名
+    chain_rows = _sheet_cells_by_row(z, 5)
+    for col, row, media in _drawing_anchors(z, 2):
+        cell = chain_rows.get(row, {}).get(col_letter(col), "")
+        name = normalize_skill_name(cell.split("\n")[0].strip())
+        if name:
+            names.setdefault(name, media)
+    # 技能表：图标统一锚在 A 列，技能名取该行 D 列
+    skill_rows = _sheet_cells_by_row(z, 4)
+    for _col, row, media in _drawing_anchors(z, 1):
+        name = normalize_skill_name(skill_rows.get(row, {}).get("D", ""))
+        if name:
+            names.setdefault(name, media)
+
+    os.makedirs(SKILL_ICON_DIR, exist_ok=True)
+    for old in os.listdir(SKILL_ICON_DIR):
+        os.remove(os.path.join(SKILL_ICON_DIR, old))
+    by_hash, icons, total = {}, {}, 0
+    for name, media in sorted(names.items()):
+        raw = z.read("xl/" + media)
+        digest = hashlib.md5(raw).hexdigest()[:8]
+        if digest not in by_hash:
+            image = Image.open(io.BytesIO(raw)).convert("RGBA")
+            # 技能表部分锚点是「图标+名称文字」的横幅图，直接缩进方格会变成不可读细条；
+            # 左侧方形区域即独立图标，裁掉右侧文字。
+            if image.width > image.height * 1.2:
+                image = image.crop((0, 0, image.height, image.height))
+            buf = io.BytesIO()
+            image.save(buf, "WEBP", lossless=True)
+            data = buf.getvalue()
+            with open(os.path.join(SKILL_ICON_DIR, f"skill_{digest}.webp"), "wb") as f:
+                f.write(data)
+            by_hash[digest] = len(data)
+        icons[name] = f"skills/skill_{digest}.webp"
+        total += by_hash[digest]
+    print("skill icons", len(icons), "unique files", len(by_hash))
+    return icons
+
+
 def main():
     sheets = load_sheets(XLSX)
     chars, html_classes = load_html_chars()
     avatar_bytes = dump_avatars(chars)
+    with zipfile.ZipFile(XLSX) as z:
+        skill_icons = extract_skill_icons(z)
     payload = {
         "stats": STATS,
         "starGrowth": 15,
@@ -213,6 +302,7 @@ def main():
         "chains": build_chains(sheets[5]),
         "types": build_types(sheets[6]),
         "rings": load_bond_rings(),
+        "skillIcons": skill_icons,
     }
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:

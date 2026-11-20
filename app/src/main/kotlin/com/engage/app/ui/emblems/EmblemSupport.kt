@@ -5,6 +5,7 @@ import com.engage.core.Dataset
 import com.engage.core.Emblem
 import com.engage.core.EmblemSkill
 import com.engage.core.SkillChain
+import com.engage.core.normalizeSkillName
 
 /** 资质在游戏内的固定顺序，检索页与详情页共用。 */
 internal val QualificationOrder = listOf(
@@ -52,20 +53,16 @@ internal fun chainsOf(dataset: Dataset, emblem: Emblem, kind: String): List<Skil
     return dataset.chains.filter { it.emblem in aliases && it.kind == kind }
 }
 
-/** 技能名在不同表里有「Lv.5 / Lv5 / SP转换 / sp转换」的写法差异，比对前先归一。 */
-private fun normalizeName(name: String): String =
-    name.replace(".", "").replace(" ", "").replace("＋", "+").lowercase()
-
 /** 技能链没有覆盖到的零散特技，按单阶链补上，避免详情页漏内容。 */
 internal fun chainLinesOf(dataset: Dataset, emblem: Emblem, kind: String): List<ChainLine> {
     val chains = chainsOf(dataset, emblem, kind)
     val covered = chains
         .flatMap { chain -> chain.steps.map { it.substringBefore('\n') } }
-        .map(::normalizeName)
+        .map(::normalizeSkillName)
         .toSet()
     val lines = chains.map { chain -> chain.toLine() }
     val extras = skillsOf(dataset, emblem, "${kind}特技")
-        .filter { normalizeName(it.name) !in covered }
+        .filter { normalizeSkillName(it.name) !in covered }
         .map { skill ->
             ChainLine(
                 family = skill.name,
