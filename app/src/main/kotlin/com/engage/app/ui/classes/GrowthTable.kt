@@ -4,17 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,24 +32,38 @@ private val HeaderHeight = 30.dp
 
 /**
  * 成长率对比表格：职业名列冻结在左，9 项成长率 + 合计横向滚动。
- * 两个 LazyColumn 共用同一 LazyListState，纵向滚动天然同步，便于跨职业逐项对比。
+ * 整表放在同一个纵向滚动容器里、每行是单个 Row，左右天然对齐；
+ * 此前左右两个 LazyColumn 共享 state 会因可见区宽度不同而错位，已弃用。
+ * 53 行规模全量组合开销可忽略，无需懒加载。
  */
 @Composable
 fun GrowthTable(classes: List<ClassInfo>, stats: List<String>, onSelect: (ClassInfo) -> Unit) {
-    val listState = rememberLazyListState()
-    Row(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.width(NameColumnWidth), state = listState) {
-            item {
-                TableHeaderCell("职业", Modifier.width(NameColumnWidth))
+    // 数值区共用一个横向滚动状态，保证各行与表头一起平移
+    val valuesScroll = rememberScrollState()
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Row {
+            TableHeaderCell("职业", Modifier.width(NameColumnWidth))
+            Row(Modifier.horizontalScroll(valuesScroll)) {
+                stats.forEach { stat ->
+                    TableHeaderCell(stat, Modifier.width(ValueColumnWidth))
+                }
+                TableHeaderCell("合计", Modifier.width(ValueColumnWidth))
             }
-            itemsIndexed(classes, key = { _, cls -> cls.name }) { index, cls ->
+        }
+        classes.forEachIndexed { index, cls ->
+            Row(
+                Modifier
+                    .height(RowHeight)
+                    .background(rowBackground(index))
+                    .clickable { onSelect(cls) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(
-                    Modifier
-                        .width(NameColumnWidth)
-                        .height(RowHeight)
-                        .background(rowBackground(index))
-                        .clickable { onSelect(cls) }
-                        .padding(horizontal = 8.dp),
+                    Modifier.width(NameColumnWidth).padding(horizontal = 8.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
@@ -63,37 +74,12 @@ fun GrowthTable(classes: List<ClassInfo>, stats: List<String>, onSelect: (ClassI
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-        }
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .horizontalScroll(rememberScrollState()),
-        ) {
-            LazyColumn(state = listState) {
-                item {
-                    Row {
-                        stats.forEach { stat ->
-                            TableHeaderCell(stat, Modifier.width(ValueColumnWidth))
-                        }
-                        TableHeaderCell("合计", Modifier.width(ValueColumnWidth))
+                Row(Modifier.horizontalScroll(valuesScroll)) {
+                    stats.forEachIndexed { statIndex, _ ->
+                        val value = cls.growth.getOrElse(statIndex) { 0 }
+                        GrowthCell(value, GrowthScale.classStat(value))
                     }
-                }
-                itemsIndexed(classes, key = { _, cls -> cls.name }) { index, cls ->
-                    Row(
-                        Modifier
-                            .height(RowHeight)
-                            .background(rowBackground(index))
-                            .clickable { onSelect(cls) },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        stats.forEachIndexed { statIndex, _ ->
-                            val value = cls.growth.getOrElse(statIndex) { 0 }
-                            GrowthCell(value, GrowthScale.classStat(value))
-                        }
-                        GrowthCell(cls.growthTotal, GrowthScale.classTotal(cls.growthTotal), bold = true)
-                    }
+                    GrowthCell(cls.growthTotal, GrowthScale.classTotal(cls.growthTotal), bold = true)
                 }
             }
         }
@@ -119,7 +105,10 @@ private fun TableHeaderCell(label: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun GrowthCell(value: Int, tier: GrowthTier, bold: Boolean = false) {
-    Box(Modifier.width(ValueColumnWidth).fillMaxHeight(), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.width(ValueColumnWidth).height(RowHeight),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(
             value.toString(),
             style = MaterialTheme.typography.bodyMedium,
