@@ -117,6 +117,21 @@ data class BondRing(
 )
 
 @Serializable
+data class EmblemWeapon(
+    /** 所属纹章士，与技能表 e 字段同写法（三鼎/库洛武为合写）。 */
+    @SerialName("e") val emblem: String,
+    @SerialName("n") val name: String,
+    /** 威力；杖/盾/宝珠等非攻击武器为 null。 */
+    @SerialName("mt") val might: Int? = null,
+    @SerialName("hit") val hit: Int? = null,
+    @SerialName("crit") val crit: Int? = null,
+    @SerialName("wt") val weight: Int? = null,
+    @SerialName("rng") val range: String? = null,
+    /** 中文效果摘要，详细说明以技能描述为准。 */
+    @SerialName("eff") val effect: String = "",
+)
+
+@Serializable
 data class Dataset(
     @SerialName("stats") val stats: List<String>,
     @SerialName("starGrowth") val starGrowth: Int,
@@ -129,6 +144,8 @@ data class Dataset(
     @SerialName("rings") val rings: List<BondRing> = emptyList(),
     /** 归一技能名 → assets 图标路径；旧数据无此字段时为空，UI 显示占位。 */
     @SerialName("skillIcons") val skillIcons: Map<String, String> = emptyMap(),
+    /** 结合武器面板数值，来源 fireemblemwiki；旧数据无此字段时为空。 */
+    @SerialName("emblemWeapons") val emblemWeapons: List<EmblemWeapon> = emptyList(),
 ) {
     val classByName: Map<String, ClassInfo> by lazy { classes.associateBy { it.name } }
 
@@ -136,6 +153,14 @@ data class Dataset(
 
     /** 按归一名查技能图标，未收录返回空串。 */
     fun skillIcon(name: String): String = skillIcons[normalizeSkillName(name)] ?: ""
+
+    private val weaponByKey: Map<String, EmblemWeapon> by lazy {
+        emblemWeapons.associateBy { normalizeSkillName(it.emblem) + "|" + normalizeSkillName(it.name) }
+    }
+
+    /** 按「纹章士 + 武器名」查结合武器面板；同名武器（刺剑/法尔西昂）各纹章士数值不同。 */
+    fun weaponOf(emblem: String, name: String): EmblemWeapon? =
+        weaponByKey[normalizeSkillName(emblem) + "|" + normalizeSkillName(name)]
 }
 
 /** 技能名在不同表里有「Lv.5 / Lv5 / SP转换 / sp转换」写法差异，比对前先归一。 */
