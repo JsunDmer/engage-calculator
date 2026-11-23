@@ -211,9 +211,6 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
     val qualifications = remember(emblem, dataset) {
         skillsOf(dataset, emblem, "解锁资质")
     }
-    val bondRings = remember(emblem, dataset) {
-        dataset.rings.filter { it.emblem == emblem.name }
-    }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -268,30 +265,11 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
             item {
                 SectionCard(title = "提供的资质") {
                     qualifications.forEachIndexed { index, skill ->
-                        SkillLine(skill, iconPath = dataset.skillIcon(skill.name), emphasizeName = true)
+                        SkillLine(skill, emphasizeName = true)
                         if (index != qualifications.lastIndex) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant,
                                 modifier = Modifier.padding(vertical = 6.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (bondRings.isNotEmpty()) {
-            item {
-                SectionCard(
-                    title = "牵绊戒指",
-                    subtitle = "${bondRings.size} 枚　C→B→A→S 递进，S 级解锁戒指特技",
-                ) {
-                    bondRings.forEachIndexed { index, ring ->
-                        RingRow(ring)
-                        if (index != bondRings.lastIndex) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                                modifier = Modifier.padding(vertical = 7.dp),
                             )
                         }
                     }
@@ -313,12 +291,12 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
         if (engageWeapons.isNotEmpty() || engageCmds.isNotEmpty() || engageSkills.isNotEmpty()) {
             item {
                 SectionCard(title = "结合", subtitle = "结合状态下可用的武器、指令与特技") {
-                    EngageGroup("结合武器", engageWeapons, dataset)
+                    EngageGroup("结合武器", engageWeapons)
                     if (engageCmds.isNotEmpty()) {
-                        EngageGroup("结合指令技", engageCmds, dataset)
+                        EngageGroup("结合指令技", engageCmds)
                     }
                     if (engageSkills.isNotEmpty()) {
-                        EngageGroup("结合特技", engageSkills, dataset)
+                        EngageGroup("结合特技", engageSkills)
                     }
                 }
             }
@@ -339,7 +317,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
             item {
                 SectionCard(title = "解锁功能", subtitle = "牵绊等级提升后开放") {
                     unlocks.forEachIndexed { index, skill ->
-                        SkillLine(skill, iconPath = dataset.skillIcon(skill.name))
+                        SkillLine(skill)
                         if (index != unlocks.lastIndex) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant,
@@ -360,7 +338,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
 
 /** 一组「名称 + 等级」明细，用于结合武器/指令技/特技这种非递进内容。 */
 @Composable
-private fun EngageGroup(title: String, skills: List<EmblemSkill>, dataset: Dataset) {
+private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
     if (skills.isEmpty()) return
     Text(
         title,
@@ -370,7 +348,7 @@ private fun EngageGroup(title: String, skills: List<EmblemSkill>, dataset: Datas
         modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
     )
     skills.forEachIndexed { index, skill ->
-        SkillLine(skill, iconPath = dataset.skillIcon(skill.name))
+        SkillLine(skill)
         if (index != skills.lastIndex) {
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
@@ -382,11 +360,9 @@ private fun EngageGroup(title: String, skills: List<EmblemSkill>, dataset: Datas
 }
 
 @Composable
-private fun SkillLine(skill: EmblemSkill, iconPath: String, emphasizeName: Boolean = false) {
+private fun SkillLine(skill: EmblemSkill, emphasizeName: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SkillIcon(iconPath, 22.dp)
-            Spacer(Modifier.width(6.dp))
             Text(
                 skill.name,
                 style = MaterialTheme.typography.bodyMedium,
