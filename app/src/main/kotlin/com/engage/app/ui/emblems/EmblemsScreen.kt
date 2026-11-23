@@ -54,6 +54,7 @@ import com.engage.app.ui.theme.WarmInk
 import com.engage.core.Dataset
 import com.engage.core.Emblem
 import com.engage.core.EmblemSkill
+import com.engage.core.EmblemWeapon
 
 private val SectionFilters = listOf("全部", "本篇", "DLC")
 private val ViewFilters = listOf("纹章士", "资质", "牵绊戒指")
@@ -291,12 +292,12 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
         if (engageWeapons.isNotEmpty() || engageCmds.isNotEmpty() || engageSkills.isNotEmpty()) {
             item {
                 SectionCard(title = "结合", subtitle = "结合状态下可用的武器、指令与特技") {
-                    EngageGroup("结合武器", engageWeapons)
+                    EngageGroup("结合武器", engageWeapons, dataset)
                     if (engageCmds.isNotEmpty()) {
-                        EngageGroup("结合指令技", engageCmds)
+                        EngageGroup("结合指令技", engageCmds, dataset)
                     }
                     if (engageSkills.isNotEmpty()) {
-                        EngageGroup("结合特技", engageSkills)
+                        EngageGroup("结合特技", engageSkills, dataset)
                     }
                 }
             }
@@ -338,7 +339,7 @@ private fun EmblemDetailScreen(emblem: Emblem, dataset: Dataset, onBack: () -> U
 
 /** 一组「名称 + 等级」明细，用于结合武器/指令技/特技这种非递进内容。 */
 @Composable
-private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
+private fun EngageGroup(title: String, skills: List<EmblemSkill>, dataset: Dataset) {
     if (skills.isEmpty()) return
     Text(
         title,
@@ -348,7 +349,8 @@ private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
         modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
     )
     skills.forEachIndexed { index, skill ->
-        SkillLine(skill)
+        // 只有结合武器有面板数值，指令技/特技查不到自然不显示
+        SkillLine(skill, weapon = dataset.weaponOf(skill.emblem, skill.name))
         if (index != skills.lastIndex) {
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
@@ -360,7 +362,7 @@ private fun EngageGroup(title: String, skills: List<EmblemSkill>) {
 }
 
 @Composable
-private fun SkillLine(skill: EmblemSkill, emphasizeName: Boolean = false) {
+private fun SkillLine(skill: EmblemSkill, weapon: EmblemWeapon? = null, emphasizeName: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -380,6 +382,10 @@ private fun SkillLine(skill: EmblemSkill, emphasizeName: Boolean = false) {
                 Text("${skill.sp} SP", style = MaterialTheme.typography.labelSmall, color = Gold)
             }
         }
+        if (weapon != null) {
+            Spacer(Modifier.height(3.dp))
+            WeaponStatBadges(weapon)
+        }
         if (skill.detail.isNotBlank()) {
             Spacer(Modifier.height(2.dp))
             Text(
@@ -394,6 +400,32 @@ private fun SkillLine(skill: EmblemSkill, emphasizeName: Boolean = false) {
                 skill.note,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+            )
+        }
+    }
+}
+
+/** 结合武器面板徽标：威力/命中/必杀/重量/射程；杖、盾、宝珠等无面板武器整行不显示。 */
+@Composable
+private fun WeaponStatBadges(weapon: EmblemWeapon) {
+    val stats = buildList {
+        weapon.might?.let { add("威力$it") }
+        weapon.hit?.let { add("命中$it") }
+        weapon.crit?.let { add("必杀$it") }
+        weapon.weight?.let { add("重量$it") }
+        weapon.range?.let { add("射程$it") }
+    }
+    if (stats.isEmpty()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        stats.forEach { label ->
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
             )
         }
     }

@@ -15,6 +15,7 @@ AVATAR_DIR = os.path.join(OUT_DIR, "avatars")
 EMBLEM_DIR = os.path.join(OUT_DIR, "emblems")
 SKILL_ICON_DIR = os.path.join(OUT_DIR, "skills")
 BOND_RINGS = os.path.join(ROOT, "tools", "bond_rings.json")
+EMBLEM_WEAPONS = os.path.join(ROOT, "tools", "emblem_weapons.json")
 
 STATS = ["HP", "力", "魔", "技", "速", "幸", "防", "魔防", "体"]
 
@@ -200,6 +201,12 @@ def load_bond_rings():
         return json.load(f)
 
 
+def load_emblem_weapons():
+    """结合武器面板数值来自 fireemblemwiki 各武器页 Engage 行，已离线整理为固定结构。"""
+    with open(EMBLEM_WEAPONS, encoding="utf-8") as f:
+        return json.load(f)["weapons"]
+
+
 def normalize_skill_name(name):
     """技能名在不同表里有「Lv.5 / Lv5 / SP转换 / sp转换」写法差异，与 App 端归一规则保持一致。"""
     return name.replace(".", "").replace(" ", "").replace("＋", "+").lower()
@@ -303,8 +310,17 @@ def main():
         "types": build_types(sheets[6]),
         "rings": load_bond_rings(),
         "skillIcons": skill_icons,
+        "emblemWeapons": load_emblem_weapons(),
     }
     os.makedirs(OUT_DIR, exist_ok=True)
+    # 每条结合武器技能行都必须有面板数值，漏配在生成阶段就报错而不是等 UI 空窗
+    weapon_keys = {(normalize_skill_name(w["e"]), normalize_skill_name(w["n"]))
+                   for w in payload["emblemWeapons"]}
+    missing = [(s["e"], s["n"]) for s in payload["skills"]
+               if s["kind"] == "结合武器"
+               and (normalize_skill_name(s["e"]), normalize_skill_name(s["n"])) not in weapon_keys]
+    if missing:
+        raise RuntimeError(f"结合武器缺少数值: {missing}")
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
     print("chars", len(payload["chars"]), "classes", len(payload["classes"]),
