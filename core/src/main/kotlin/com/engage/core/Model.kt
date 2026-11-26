@@ -24,6 +24,10 @@ data class Character(
     @SerialName("rec") val recommendedClass: String,
     /** assets 内的头像相对路径，空串表示无头像。 */
     @SerialName("avatar") val avatar: String = "",
+    /** 个人特技名，空串表示无。 */
+    @SerialName("ps") val personalSkill: String = "",
+    /** 个人特技说明。 */
+    @SerialName("psd") val personalSkillDetail: String = "",
 )
 
 @Serializable

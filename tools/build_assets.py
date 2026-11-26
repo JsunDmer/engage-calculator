@@ -195,6 +195,25 @@ def merge_classes(html_classes, sheet_classes):
     return out
 
 
+def merge_char_skills(chars, rows):
+    """从人物成长率表 G/H 列读取个人特技和特技说明，按角色名合并进 chars。"""
+    # 表头占 4 行（标题、说明、分组、列名），数据从第 5 行开始
+    extra = {}
+    for row in rows[4:]:
+        name = row.get("B", "").strip()
+        if not name:
+            continue
+        skill = row.get("G", "").strip()
+        detail = row.get("H", "").strip()
+        if skill and skill not in ("--", "-", "—"):
+            extra[name] = {"ps": skill, "psd": detail}
+    for ch in chars:
+        info = extra.get(ch.get("n", ""), {})
+        ch["ps"] = info.get("ps", "")
+        ch["psd"] = info.get("psd", "")
+    return chars
+
+
 def load_bond_rings():
     """牵绊戒指表来自腾讯文档「04-牵绊戒指」，已离线解析为固定结构。"""
     with open(BOND_RINGS, encoding="utf-8") as f:
@@ -297,6 +316,7 @@ def main():
     sheets = load_sheets(XLSX)
     chars, html_classes = load_html_chars()
     avatar_bytes = dump_avatars(chars)
+    merge_char_skills(chars, sheets[1])
     with zipfile.ZipFile(XLSX) as z:
         skill_icons = extract_skill_icons(z)
     payload = {

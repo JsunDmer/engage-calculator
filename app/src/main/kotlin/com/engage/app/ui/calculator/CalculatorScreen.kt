@@ -174,6 +174,23 @@ private fun CharacterCard(state: CalcUiState, onClick: () -> Unit, onToggleStar:
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (state.character.personalSkill.isNotEmpty()) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "特技：${state.character.personalSkill}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    if (state.character.personalSkillDetail.isNotEmpty()) {
+                        Text(
+                            state.character.personalSkillDetail,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 15.sp,
+                        )
+                    }
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
